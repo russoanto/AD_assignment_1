@@ -1,3 +1,4 @@
+#include <cmath>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
@@ -103,6 +104,27 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
     //  end if
     //end for
 	return clusters;	
+}
+
+/*Given a pointcloud find the centroid (the average of the points)*/
+
+void getCentroid(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointXYZ &centroid_coords){
+    int num_points = cloud->points.size();
+    float x_a = 0.0;
+    float y_a = 0.0;
+    float z_a = 0.0;
+
+    for(int i = 0; i < num_points; i++){
+        x_a += cloud->points[i].x;
+        y_a += cloud->points[i].y;
+        z_a += cloud->points[i].z;
+    }
+    x_a = x_a / num_points;
+    y_a = y_a / num_points;
+    z_a = z_a / num_points;
+    centroid_coords.x = x_a;
+    centroid_coords.y = y_a;
+    centroid_coords.z = z_a;
 }
 
 
@@ -218,7 +240,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
     #endif
 
-    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(0,1,1)};
 
 
     /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
@@ -226,8 +248,10 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     To separate each cluster out of the vector<PointIndices> we have to iterate through cluster_indices, create a new PointCloud for each entry and write all points of the current cluster in the PointCloud.
     Compute euclidean distance
     **/
+
     int j = 0;
     int clusterId = 0;
+    pcl::PointXYZ centroid;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
@@ -241,7 +265,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         // TODO: 7) render the cluster and plane without rendering the original cloud 
         //<-- here
         //----------
-        renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[0]);
+        renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[2]);
         renderer.RenderPointCloud(cloud_plane, "groundCloud"+std::to_string(clusterId),colors[1]);
 
         //Here we create the bounding box on the detected clusters
@@ -249,17 +273,30 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
 
         //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
+
+        getCentroid(cloud_cluster,centroid);
+        pcl::PointXYZ ego_veicle_coords(0.f,0.f,0.f);
+        float distance = std::hypot(std::hypot(ego_veicle_coords.x-centroid.x,ego_veicle_coords.y-centroid.y),ego_veicle_coords.z-centroid.z);
+
+        renderer.addText(centroid.x,centroid.y,centroid.z,std::to_string(distance));
+
         Box box{minPt.x, minPt.y, minPt.z,
         maxPt.x, maxPt.y, maxPt.z};
         //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
         //please take a look at the function RenderBox to see how to color the box
-        renderer.RenderBox(box, j);
+        if(distance >= 5.0  && centroid.x < 0){
+            renderer.RenderBox(box, j, colors[0], 1.0);
+        }else{
+            renderer.RenderBox(box, j, colors[3], 1.0);
+        }
 
         ++clusterId;
         j++;
     }  
 
 }
+
+
 
 
 int main(int argc, char* argv[])
