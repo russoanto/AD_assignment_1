@@ -111,6 +111,13 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
 
+    pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
+    downSampler.setInputCloud (cloud);
+    downSampler.setLeafSize (0.01f, 0.01f, 0.01f);
+    downSampler.filter (*cloud_filtered);
+
+    std::cout << "cloud normale: " << cloud->points.size() << std::endl;
+
     // 2) here we crop the points that are far away from us, in which we are not interested
     pcl::CropBox<pcl::PointXYZ> cb(true);
     cb.setInputCloud(cloud_filtered);
@@ -190,7 +197,7 @@ int main(int argc, char* argv[])
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"/home/thrun/Desktop/1_lidar/dataset_1"},
+    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"./dataset_1"},
                                                 boost::filesystem::directory_iterator{});
 
     // sort files in ascending (chronological) order
