@@ -109,8 +109,7 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 void 
 ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 {
-    std::cout << "=============================" << std::endl;
-    std::cout << "CLOUD DIM: " << cloud->points.size() << std::endl;
+
     // TODO: 1) Downsample the dataset 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
@@ -121,9 +120,6 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     downSampler.setInputCloud (cloud);
     downSampler.setLeafSize (0.1f, 0.1f, 0.1f);
     downSampler.filter (*cloud_filtered);
-
-    std::cout << "FILTER CLOUD: " << cloud_filtered->points.size() << std::endl;
-    std::cout << "=============================" << std::endl;
 
     // 2) here we crop the points that are far away from us, in which we are not interested
     pcl::CropBox<pcl::PointXYZ> cb(true);
@@ -139,7 +135,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.1); // determines how close a point must be to the model in order to be considered an inlier
+    seg.setDistanceThreshold (0.2); // determines how close a point must be to the model in order to be considered an inlier
 
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
@@ -204,7 +200,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         //Set the spatial tolerance for new cluster candidates
         //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
-        ec.setClusterTolerance (1.0); // 2cm
+        ec.setClusterTolerance (0.6); // 2cm
 
         //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (100);
@@ -241,12 +237,12 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[2]);
+        //renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[2]);
         // TODO: 7) render the cluster and plane without rendering the original cloud 
         //<-- here
         //----------
-        std::cout << "size cluster: " << cloud_cluster->points.size() << std::endl;
-        renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[1]);
+        renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[0]);
+        renderer.RenderPointCloud(cloud_plane, "groundCloud"+std::to_string(clusterId),colors[1]);
 
         //Here we create the bounding box on the detected clusters
         pcl::PointXYZ minPt, maxPt;
