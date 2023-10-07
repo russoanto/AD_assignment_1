@@ -89,20 +89,25 @@ This function builds the clusters following a euclidean clustering approach
         + cluster: at the end of this function we will have a set of clusters
 TODO: Complete the function
 */
+
 std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, float distanceTol, int setMinClusterSize, int setMaxClusterSize)
 {
+
 	my_visited_set_t visited{};                                                          //already visited points
 	std::vector<pcl::PointIndices> clusters;                                             //vector of PointIndices that will contain all the clusters
     std::vector<int> cluster;                                                            //vector of int that is used to store the points that the function proximity will give me back
-	//for every point of the cloud
-    //  if the point has not been visited (use the function called "find")
-    //    find clusters using the proximity function
-    //
-    //    if we have more clusters than the minimum
-    //      Create the cluster and insert it in the vector of clusters. You can extract the indices from the cluster returned by the proximity funciton (use pcl::PointIndices)   
-    //    end if
-    //  end if
-    //end for
+	pcl::PointIndices indices;
+
+    for(int i = 0; i < cloud->points.size(); i++){
+        if(visited.find(i) == visited.end()){
+            proximity(cloud, i, tree,  distanceTol, visited,  cluster,  setMaxClusterSize);
+            if(cluster.size() >= setMinClusterSize){
+                indices.indices = cluster;
+                clusters.push_back(indices);
+            }
+            cluster.clear();
+        }
+    }
 	return clusters;	
 }
 
@@ -157,7 +162,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.2); // determines how close a point must be to the model in order to be considered an inlier
+    seg.setDistanceThreshold (0.4); // 0.2
 
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
@@ -222,7 +227,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         //Set the spatial tolerance for new cluster candidates
         //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
-        ec.setClusterTolerance (0.6); // 2cm
+        ec.setClusterTolerance (0.6); // 0.6
 
         //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (100);
@@ -237,7 +242,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
         setupKdtree(cloud_filtered, &treeM, 3);
-        cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
+        cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.6, 100, 25000);
     #endif
 
     std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(0,1,1)};
@@ -301,6 +306,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
 int main(int argc, char* argv[])
 {
+
     Renderer renderer;
     renderer.InitCamera(CameraAngle::XY);
     // Clear viewer
