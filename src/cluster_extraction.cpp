@@ -17,8 +17,10 @@
 #include <chrono>
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
+#include <pcl/filters/statistical_outlier_removal.h>
 
 #define USE_PCL_LIBRARY
+
 using namespace lidar_obstacle_detection;
 
 typedef std::unordered_set<int> my_visited_set_t;
@@ -143,10 +145,17 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_aux (new pcl::PointCloud<pcl::PointXYZ> ());
 
 
-    pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
-    downSampler.setInputCloud (cloud);
-    downSampler.setLeafSize (0.1f, 0.1f, 0.1f);
-    downSampler.filter (*cloud_filtered);
+    #ifndef USE_PCL_LIBRARY
+        pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
+        downSampler.setInputCloud (cloud);
+        downSampler.setLeafSize (0.2f, 0.2f, 0.2f);
+        downSampler.filter (*cloud_filtered);
+    #else
+        pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
+        downSampler.setInputCloud (cloud);
+        downSampler.setLeafSize (0.1f, 0.1f, 0.1f);
+        downSampler.filter (*cloud_filtered);
+    #endif
 
     // 2) here we crop the points that are far away from us, in which we are not interested
     pcl::CropBox<pcl::PointXYZ> cb(true);
@@ -158,12 +167,11 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     // TODO: 3) Segmentation and apply RANSAC
 
     pcl::SACSegmentation<pcl::PointXYZ> seg;
-    seg.setOptimizeCoefficients (true);
+    seg.setOptimizeCoefficients (true); // true
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.4); // 0.2
-
+    seg.setMaxIterations (10000);
+    seg.setDistanceThreshold (0.2); // 0.4
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
 
@@ -245,7 +253,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.6, 100, 25000);
     #endif
 
-    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(0,1,1)};
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(1,1,0.90)};
 
 
     /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
@@ -266,7 +274,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        //renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[2]);
+        //renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[4]);
         // TODO: 7) render the cluster and plane without rendering the original cloud 
         //<-- here
         //----------
@@ -314,7 +322,7 @@ int main(int argc, char* argv[])
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"./dataset_1"},
+    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"../dataset_1"},
                                                 boost::filesystem::directory_iterator{});
 
     // sort files in ascending (chronological) order
