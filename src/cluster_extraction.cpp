@@ -19,7 +19,7 @@
 #include "../include/tree_utilities.hpp"
 #include <pcl/filters/statistical_outlier_removal.h>
 
-#define USE_PCL_LIBRARY
+//#define USE_PCL_LIBRARY
 
 using namespace lidar_obstacle_detection;
 
@@ -162,7 +162,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     cb.setInputCloud(cloud_filtered);
     cb.setMin(Eigen::Vector4f (-20, -6, -2, 1));
     cb.setMax(Eigen::Vector4f ( 30, 7, 5, 1));
-    cb.filter(*cloud_filtered); 
+    cb.filter(*cloud_filtered);
 
     // TODO: 3) Segmentation and apply RANSAC
 
@@ -175,13 +175,13 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
 
-    int i = 0, nr_points = (int) cloud_filtered->size ();
+    int nr_points = (int) cloud_filtered->size ();
     // Now we will remove the planes from the filtered point cloud 
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ()); //the resultant model coefficients
     //inliers represent the points of the point cloud representing the plane, coefficients of the model that represents the plane (4 points of the plane)
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
 
-    while (cloud_filtered->size () > 0.3 * nr_points){
+    while (cloud_filtered->size () > 0.5 * nr_points){ //0.3
         // Segment the largest planar component from the remaining cloud <-
         seg.setInputCloud (cloud_filtered);
         /*
@@ -206,16 +206,13 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         extract.setIndices (inliers);
         extract.setNegative (false); // Retrieve indices to all points in cloud_filtered but only those referenced by inliers:
         extract.filter (*cloud_plane);   // We effectively retrieve JUST the plane
-        
 
         // Here we will extract the plane from the original filtered point cloud
         extract.setNegative (true); // original cloud - plane 
         extract.filter (*cloud_aux);  // We write into cloud_f the cloud without the extracted plane
         
         cloud_filtered.swap (cloud_aux); // Here we swap the cloud (the removed plane one) with the original
-        i++;
     }
-
 
     // TODO: 5) Create the KDTree and the vector of PointIndices
 
@@ -235,7 +232,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         //Set the spatial tolerance for new cluster candidates
         //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
-        ec.setClusterTolerance (0.6); // 0.6
+        ec.setClusterTolerance (0.3); // 0.6
 
         //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (100);
@@ -250,7 +247,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
         setupKdtree(cloud_filtered, &treeM, 3);
-        cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.6, 100, 25000);
+        cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.3, 100, 25000);
     #endif
 
     std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(1,1,0.90)};
@@ -276,8 +273,8 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         //renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[4]);
         // TODO: 7) render the cluster and plane without rendering the original cloud 
-        //<-- here
-        //----------
+ 
+
         renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[2]);
         renderer.RenderPointCloud(cloud_plane, "groundCloud"+std::to_string(clusterId),colors[1]);
 
@@ -290,14 +287,13 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         getCentroid(cloud_cluster,centroid);
         pcl::PointXYZ ego_veicle_coords(0.f,0.f,0.f);
         float distance = std::hypot(std::hypot(ego_veicle_coords.x-centroid.x,ego_veicle_coords.y-centroid.y),ego_veicle_coords.z-centroid.z);
-
         renderer.addText(centroid.x,centroid.y,centroid.z,std::to_string(distance));
 
         Box box{minPt.x, minPt.y, minPt.z,
         maxPt.x, maxPt.y, maxPt.z};
         //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
         //please take a look at the function RenderBox to see how to color the box
-        if(distance >= 5.0  && centroid.x < 0){
+        if(distance >= 5.0  && centroid.x > 0){
             renderer.RenderBox(box, j, colors[0], 1.0);
         }else{
             renderer.RenderBox(box, j, colors[3], 1.0);
@@ -310,8 +306,6 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 }
 
 
-
-
 int main(int argc, char* argv[])
 {
 
@@ -322,7 +316,7 @@ int main(int argc, char* argv[])
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"../dataset_1"},
+    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"../dataset_2"},
                                                 boost::filesystem::directory_iterator{});
 
     // sort files in ascending (chronological) order
