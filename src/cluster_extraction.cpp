@@ -22,9 +22,19 @@
 #define USE_PCL_LIBRARY
 
 
-#define DISTANCE_THREASHOLD 0.2  //0.2
-#define CLUSTER_TOLLERANCE 0.3  //0.3
-#define PERCENT_GROUND 0.5
+
+#ifdef USE_PCL_LIBRARY
+    #define DISTANCE_THREASHOLD 0.2  //0.2
+    #define CLUSTER_TOLLERANCE 0.3  //0.3
+    #define PERCENT_GROUND 0.5
+    #define LEAF_SIZE 0.1
+
+#else
+    #define DISTANCE_THREASHOLD 0.2  //0.2
+    #define CLUSTER_TOLLERANCE 0.3  //0.3
+    #define PERCENT_GROUND 0.5
+    #define LEAF_SIZE 0.2
+#endif
 
 using namespace lidar_obstacle_detection;
 
@@ -150,17 +160,11 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_aux (new pcl::PointCloud<pcl::PointXYZ> ());
 
 
-    #ifndef USE_PCL_LIBRARY
-        pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
-        downSampler.setInputCloud (cloud);
-        downSampler.setLeafSize (0.2f, 0.2f, 0.2f);
-        downSampler.filter (*cloud_filtered);
-    #else
-        pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
-        downSampler.setInputCloud (cloud);
-        downSampler.setLeafSize (0.1f, 0.1f, 0.1f);
-        downSampler.filter (*cloud_filtered);
-    #endif
+    pcl::VoxelGrid<pcl::PointXYZ> downSampler; 
+    downSampler.setInputCloud (cloud);
+    downSampler.setLeafSize (LEAF_SIZE, LEAF_SIZE, LEAF_SIZE);
+    downSampler.filter (*cloud_filtered);
+
 
     // 2) here we crop the points that are far away from us, in which we are not interested
     pcl::CropBox<pcl::PointXYZ> cb(true);
@@ -184,37 +188,29 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
 
-    while (cloud_filtered->size () > PERCENT_GROUND * nr_points){ //0.3
+    while (cloud_filtered->size () > PERCENT_GROUND * nr_points){
         // Segment the largest planar component from the remaining cloud <-
         seg.setInputCloud (cloud_filtered);
-        /*
-        Base method for segmentation of a model in a PointCloud given by <setInputCloud (), setIndices ()>
-        [out]	inliers	the resultant point indices that support the model found (inliers)
-        [out]	model_coefficients	the resultant model coefficients that describe the plane 
-        */
-        seg.segment (*inliers, *coefficients); //we get one of the planes and we put it into the inliers variable
+
+        seg.segment (*inliers, *coefficients);
         if (inliers->indices.size () == 0)
         {
             std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
             break;
         }
 
-        // Create the filtering object
         pcl::ExtractIndices<pcl::PointXYZ> extract;
 
-        // Extract the inliers (here we extract the points of the plane moving the indices representing the plane to cloud_segmented)
         extract.setInputCloud (cloud_filtered); 
         
-        //PCL defines a way to define a region of interest / list of point indices that the algorithm should operate on, rather than the entire cloud, via setIndices.
         extract.setIndices (inliers);
-        extract.setNegative (false); // Retrieve indices to all points in cloud_filtered but only those referenced by inliers:
-        extract.filter (*cloud_plane);   // We effectively retrieve JUST the plane
+        extract.setNegative (false);
+        extract.filter (*cloud_plane);
 
-        // Here we will extract the plane from the original filtered point cloud
-        extract.setNegative (true); // original cloud - plane 
-        extract.filter (*cloud_aux);  // We write into cloud_f the cloud without the extracted plane
+        extract.setNegative (true);
+        extract.filter (*cloud_aux);
         
-        cloud_filtered.swap (cloud_aux); // Here we swap the cloud (the removed plane one) with the original
+        cloud_filtered.swap (cloud_aux);
     }
 
     // TODO: 5) Create the KDTree and the vector of PointIndices
@@ -233,16 +229,14 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
 
-        //Set the spatial tolerance for new cluster candidates
-        //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
         ec.setClusterTolerance (CLUSTER_TOLLERANCE);
 
-        //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (100);
         ec.setMaxClusterSize (25000);
         ec.setSearchMethod (tree);
         ec.setInputCloud (cloud_filtered);
         ec.extract (cluster_indices);
+
 
     
     #else
@@ -251,16 +245,11 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         treeM.set_dimension(3);
         setupKdtree(cloud_filtered, &treeM, 3);
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.3, 100, 25000);
+
     #endif
 
     std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(1,1,0.90), Color(1,0.98,0)};
 
-
-    /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
-
-    To separate each cluster out of the vector<PointIndices> we have to iterate through cluster_indices, create a new PointCloud for each entry and write all points of the current cluster in the PointCloud.
-    Compute euclidean distance
-    **/
 
     int j = 0;
     int clusterId = 0;
@@ -281,7 +270,6 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[2]);
         renderer.RenderPointCloud(cloud_plane, "groundCloud"+std::to_string(clusterId),colors[1]);
 
-        std::cout << "plane size: " << cloud_plane->points.size() << std::endl;
 
         //Here we create the bounding box on the detected clusters
         pcl::PointXYZ minPt, maxPt;

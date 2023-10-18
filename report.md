@@ -16,6 +16,5 @@ Per quel che riguarda il primo dataset gli oggetti della detection con eucliden 
 
 ## Dataset 2
 Per far funzionare il seguente programma con il dataset 2 sono andato ad agire sul parametro della percentuale di punti rimanenti della cloud 
-prima dell'interruzione nella fase di segmentazione, portandola al 50% poichè con un valore inferiore parte del ground viene tagliato e non si ha una buona segmentazione il che portava a falsi negativi.
-
+prima dell'interruzione nella fase di segmentazione, portandola al 50% poichè con un valore inferiore parte del ground viene tagliato e non si ha una buona segmentazione, il che portava a falsi negativi. In questo caso le performance sono inferiori rispetto al primo cluster, differenza che è ben evidente andando ad utilizzare la funzione euclideanClustering da me fatta. La ragione che mi sono dato al calo di performance è il numero di cluster che in questo dataset è sensibilmente maggiore il che significa che viene utilizzata più volte la ricerca per raggio, operazione abbastanza complessa infatti andando ad utilizzare la funzione da me implementata dai euclideanClustering all'incirca l'80%del tempo di esecuzione, per ogni frame, è stato speso per la creazione dei cluster (il che denota oltre che l'esecuzione di un operazione complessa una implementazione non ottimizzata).
 
