@@ -19,7 +19,12 @@
 #include "../include/tree_utilities.hpp"
 #include <pcl/filters/statistical_outlier_removal.h>
 
-//#define USE_PCL_LIBRARY
+#define USE_PCL_LIBRARY
+
+
+#define DISTANCE_THREASHOLD 0.2  //0.2
+#define CLUSTER_TOLLERANCE 0.3  //0.3
+#define PERCENT_GROUND 0.5
 
 using namespace lidar_obstacle_detection;
 
@@ -171,17 +176,15 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setMaxIterations (10000);
-    seg.setDistanceThreshold (0.2); // 0.4
+    seg.setDistanceThreshold (DISTANCE_THREASHOLD); // 0.4
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
 
     int nr_points = (int) cloud_filtered->size ();
-    // Now we will remove the planes from the filtered point cloud 
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ()); //the resultant model coefficients
-    //inliers represent the points of the point cloud representing the plane, coefficients of the model that represents the plane (4 points of the plane)
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
 
-    while (cloud_filtered->size () > 0.5 * nr_points){ //0.3
+    while (cloud_filtered->size () > PERCENT_GROUND * nr_points){ //0.3
         // Segment the largest planar component from the remaining cloud <-
         seg.setInputCloud (cloud_filtered);
         /*
@@ -232,7 +235,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         //Set the spatial tolerance for new cluster candidates
         //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
-        ec.setClusterTolerance (0.3); // 0.6
+        ec.setClusterTolerance (CLUSTER_TOLLERANCE);
 
         //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (100);
@@ -250,7 +253,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, 0.3, 100, 25000);
     #endif
 
-    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(1,1,0.90)};
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(0,1,0), Color(1,1,0.90), Color(1,0.98,0)};
 
 
     /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
@@ -278,13 +281,18 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         renderer.RenderPointCloud(cloud_cluster,"filteredCloud"+std::to_string(clusterId),colors[2]);
         renderer.RenderPointCloud(cloud_plane, "groundCloud"+std::to_string(clusterId),colors[1]);
 
+        std::cout << "plane size: " << cloud_plane->points.size() << std::endl;
+
         //Here we create the bounding box on the detected clusters
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
 
+
+
         //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
 
         getCentroid(cloud_cluster,centroid);
+
         pcl::PointXYZ ego_veicle_coords(0.f,0.f,0.f);
         float distance = std::hypot(std::hypot(ego_veicle_coords.x-centroid.x,ego_veicle_coords.y-centroid.y),ego_veicle_coords.z-centroid.z);
         renderer.addText(centroid.x,centroid.y,centroid.z,std::to_string(distance));
@@ -337,7 +345,6 @@ int main(int argc, char* argv[])
         auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
         std::cout << "[PointCloudProcessor<PointT>::ReadPcdFile] Loaded "
         << input_cloud->points.size() << " data points from " << streamIterator->string() <<  "plane segmentation took " << elapsedTime.count() << " milliseconds" << std::endl;
-
         streamIterator++;
         if(streamIterator == stream.end())
             streamIterator = stream.begin();
